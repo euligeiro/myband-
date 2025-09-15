@@ -1,0 +1,179 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background: #ffffff;
+    /* Fundo branco para a página */
+    color: #1b1c1d;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* Centraliza todo o conteúdo horizontalmente */
+}
+
+
+/* --- Header --- */
+
+nav {
+    display: flex;
+    justify-content: space-between;
+    background: #2c2c2c;
+    padding: 10px 30px;
+    width: 100%;
+}
+
+.band-info {
+    display: flex;
+    align-items: center;
+}
+
+.band-logo {
+    width: 60px;
+    margin-right: 15px;
+}
+
+.band-logo img {
+    width: 100%;
+    height: auto;
+}
+
+.band-name {
+    font-size: 20px;
+    font-weight: bold;
+    color: #f39c12;
+}
+
+
+/* --- Menu --- */
+
+nav ul {
+    list-style: none;
+    display: flex;
+    gap: 20px;
+}
+
+nav ul li a {
+    text-decoration: none;
+    color: #fff;
+    font-size: 14px;
+    transition: color 0.3s;
+}
+
+nav ul li a:hover {
+    color: #f39c12;
+}
+
+
+/* --- Footer --- */
+
+footer {
+    text-align: center;
+    padding: 10px;
+    background: #2c2c2c;
+    font-size: 14px;
+    color: #aaa;
+}
+
+
+/* --- Setlist Section --- */
+
+.setlist-section {
+    padding: 3rem 1rem;
+    width: 100%;
+    max-width: 1000px;
+    margin: auto;
+    /* Garante que a seção inteira esteja centralizada */
+}
+
+.setlist-container {
+    background: #ffffff;
+    border: 1px solid #444;
+    /* Borda externa da tabela */
+}
+
+
+/* Container do título e da barra de pesquisa */
+
+.header-container {
+    background: #008080;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 1rem;
+}
+
+.search-bar-container {
+    flex-basis: 30%;
+}
+
+.search-bar-container input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+}
+
+.setlist-title {
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-align: center;
+    flex-grow: 1;
+    /* Ocupa o espaço restante */
+}
+
+
+/* --- Tabela --- */
+
+.setlist-table {
+    width: 100%;
+    /*border-collapse: collapse;*/
+    color: #1b1c1d;
+    text-align: left;
+}
+
+.setlist-table thead th {
+    background: #008080;
+    color: white;
+    padding: 1rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    text-align: center;
+    border: 1px solid #444;
+}
+
+.setlist-table td {
+    padding: 0.8rem;
+    border: 1px solid #444;
+    font-size: 1rem;
+}
+
+.setlist-table tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+.setlist-table tr:hover td {
+    background-color: #e0e0e0;
+}
+
+.setlist-table a {
+    text-decoration: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+
+/* --- Seta de ordenação --- */
+
+.sort-arrow {
+    font-size: 0.8rem;
+}
