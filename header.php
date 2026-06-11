@@ -1,163 +1,168 @@
 <?php
-include 'band_generators.php';
-require_once 'conexion_BDD.php';
+require('band_generators.php');
+require('dbconnect.php');
 
-// Verificar se há pedido de logout
-if (isset($_GET['disconnect']) && $_GET['disconnect'] == 1) {
-    session_unset();
-    session_destroy();
-    header('Location: ' . $_SERVER['PHP_SELF']);
-    exit;
-}
+//Load Session Variables
+session_start();
 
-// Processar formulário de login
-$login_error = '';
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
-    
-    try {
-        $db = getDBConnection();
-        $query = $db->prepare("SELECT * FROM admin WHERE username = :username");
-        $query->execute([':username' => $username]);
-        $admin = $query->fetch(PDO::FETCH_ASSOC);
-        
-        if ($admin && password_verify($password, $admin['password'])) {
-            $_SESSION['admin_logged_in'] = true;
-            $_SESSION['admin_username'] = $admin['username'];
-            $_SESSION['admin_id'] = $admin['id'];
-        }
 
- if($username==='admin' && $password==='admin123')
- {
-     $_SESSION['admin_logged_in'] = true;
-      $_SESSION['admin_username'] = $admin['username'];
-
- }
-
-         else {
-            $login_error = "Identifiants incorrects";
-        }
-    } catch(PDOException $e) {
-        $login_error = "Erreur de connexion à la base de données";
+//check disconnect
+if (isset($_GET["disconnect"])){
+    if ($_GET["disconnect"]==1){
+        unset($_SESSION["login"]);
     }
 }
 
-$is_logged_in = isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'];
+
+
+//check credentiels
+if (isset($_POST['login'])){
+    if (isset($_POST["password"])){
+        
+        $sql="SELECT COUNT(*) FROM members"; 
+
+        $connexion=dbconnect(); 
+        if(!$connexion->query($sql)) {
+            echo "Pb d'accès à la bdd"; 
+        }
+        else{
+            
+            /* Query Prepare */
+            $sql = "SELECT * FROM members WHERE login = :login AND password=:password";
+
+
+            $query = $connexion->prepare($sql);
+            $query->bindValue(':login', $_POST['login'], PDO::PARAM_STR);
+            $query->bindValue(':password', $_POST['password'], PDO::PARAM_STR);
+            $query->execute();
+            $members_array = $query->fetchAll();
+
+            $row_count = count($members_array);
+
+            // Check the number of rows that match the SELECT statement 
+            if($row_count==1) 
+            {
+                $member_row = $members_array[0];
+                $_SESSION['login'] = $member_row['login'];
+                $_SESSION['user_id'] = $member_row['id'];
+                $_SESSION['admin'] = $member_row['admin'];
+                $_SESSION['email'] = $member_row['email'];
+            }
+        }
+
+        $connexion=null;
+    }
+}
+
+
+
+//set admin var = true if user is logged
+$admin = false;
+$guest = true;
+$member = false;
+
+if (isset($_SESSION["login"])){
+    $guest = false;
+    $member = true;
+    if (isset($_SESSION["admin"]) && $_SESSION["admin"] == 1) {
+        $admin = true;
+    }
+}
+
+
+//manage band name & logo
+if (!isset($_SESSION["bandname"])){
+    $_SESSION["bandname"] = generate_bandname() ;
+}
+
+if (!isset($_SESSION["bandlogo"])){
+    $_SESSION["bandlogo"] = generate_bandlogo() ;
+}
+
 ?>
-<!DOCTYPE html>
-<html lang="fr">
+
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Band - <?php echo $page_title; ?></title>
-    <link rel="stylesheet" href="estilo.css">
-    <style>
-        .modal {
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            display: none;
-        }
+<title>My Band</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet" type="text/css">
 
-        .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 300px;
-            border-radius: 5px;
-        }
+    <!-- Font Awesome CSS -->
+    <link rel='stylesheet' href='https://use.fontawesome.com/releases/v5.3.1/css/all.css'>
 
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        
-        .close:hover {
-            color: black;
-        }
-        
-        .modal-form div {
-            margin-bottom: 15px;
-        }
-        
-        .modal-form label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        
-        .modal-form input {
-            width: 100%;
-            padding: 8px;
-            box-sizing: border-box;
-        }
-        
-        .modal-form button {
-            background: #008080;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            cursor: pointer;
-            width: 100%;
-        }
-        
-        .error-message {
-            color: red;
-            margin-bottom: 15px;
-        }
-    </style>
+
+  <link rel="stylesheet" href="myband.css">
+
+  <script>
+    /**
+     * Display authentication modal form : 
+     */
+    function authenticate() {
+        // Display loginModal div and display it
+        let modal = document.getElementById('loginModal');
+        modal.style.display='block';
+    }
+
+    /**
+     * Disconnection
+     */
+    function disconnect() {
+        window.location.href = "<?php echo htmlspecialchars($_SERVER["PHP_SELF"]);?>" + '?disconnect=1';
+    }
+  </script>
+
+  
 </head>
 <body>
-
-    <nav>
-        <div class="band-info">
-            <div class="band-logo">
-                <img src="<?php echo generate_bandlogo(); ?>" alt="Logo du groupe">
-            </div>
-            <div class="band-name">
-                <?php echo generate_bandname(); ?>
-            </div>
-        </div>  
+    <!-- NAV BAR -->
+    <div class="navbar">
         <ul>
-            <li><a href="index.php">HOME</a></li>
-            <?php if ($is_logged_in): ?>
-                <li><a href="?disconnect=1">DISCONNECT</a></li>
-            <?php else: ?>
-                <li><a href="#" onclick="document.getElementById('loginModal').style.display='block'">CONNECT</a></li>
-            <?php endif; ?>
-            <li><a href="setlist.php">SETLIST</a></li>
-            <li><a href="contact.php">CONTACT</a></li>
+            <li class="brandlogo"><img height="75" src="logo.php?logo=<?php echo $_SESSION['bandlogo']  ;?>"/></li>
+            <li class="brandtext">&nbsp;&nbsp;<?php echo $_SESSION["bandname"] ;?></li>
+        
+            <li style="float:right;"><a href="contact.php">CONTACT</a></li>
+            <?php 
+                if ($admin){ 
+                    ?>
+                    <li style="float:right;"><a href="#" onclick="disconnect();">DISCONNECT</a></li>
+                    <?php
+                }
+                else{
+                    ?>
+                    <li style="float:right;"><a href="#" onclick="authenticate();">CONNECT</a></li>
+                    <?php
+                }
+            ?>
+            <li style="float:right;"><a href="setlist.php">SETLIST</a></li>
+            
+            <li style="float:right"><a href="index.php">HOME</a></li>
+        
         </ul>
-    </nav>
 
-    <!-- Modal de Login -->
-    <div id="loginModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="document.getElementById('loginModal').style.display='none'">&times;</span>
-            <h2>Connexion Admin</h2>
-            <?php if (!empty($login_error)): ?>
-                <p class="error-message"><?php echo $login_error; ?></p>
-            <?php endif; ?>
-            <form class="modal-form" method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>">
-                <div>
-                    <label for="username">Nom d'utilisateur:</label>
-                    <input type="text" id="username" name="username" required>
-                </div>
-                <div>
-                    <label for="password">Mot de passe:</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                <button type="submit" name="login">Login</button>
-            </form>
-        </div>
     </div>
 
-    <main>
+    <!-- Authentication Form DIV -->
+    <div id="loginModal" class="modal">
+  
+        <form id="loginForm" class="modal-content animate" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]);?>" method="post">
+            <div class="dlgheadcontainer">
+                <span onclick="document.getElementById('loginModal').style.display='none'" class="close" title="Close Modal">&times;</span>
+                    <h1>Log-in !</h1>
+            </div>
+
+            <div class="dlgcontainer">
+                <label for="uname"><b>Username</b></label>
+                <input type="text" placeholder="Enter Username" name="login" id="login" required>
+
+                <label for="psw"><b>Password</b></label>
+                <input type="password" placeholder="Enter Password" name="password" id="password" required>
+                    
+                <button type="submit" class="okbtn">Login</button>
+                <button type="button" onclick="document.getElementById('loginModal').style.display='none'" class="cancelbtn">Cancel</button>
+
+            </div>
+
+        </form>
+    </div>
+    

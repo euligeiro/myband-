@@ -1,227 +1,327 @@
 <?php
-// Definir título da página
-$page_title = "Setlist";
+require('header.php');
 
-// Incluir header
-require 'header.php';
+$connexion=dbconnect(); 
 
-// Conexão com a base de dados
-$db = getDBConnection();
+/* Manage set list actions */
+if (isset($_POST["formsongaction"])){
 
-// Parâmetros de ordenação
-$order_by = isset($_GET['order_by']) ? $_GET['order_by'] : 'title';
-$order_dir = isset($_GET['order_dir']) ? $_GET['order_dir'] : 'ASC';
-
-// Validar parâmetros de ordenação
-$allowed_orders = ['title', 'artist', 'style'];
-if (!in_array($order_by, $allowed_orders)) {
-    $order_by = 'title';
-}
-$allowed_directions = ['ASC', 'DESC'];
-if (!in_array($order_dir, $allowed_directions)) {
-    $order_dir = 'ASC';
-}
-$next_order_dir = ($order_dir === 'ASC') ? 'DESC' : 'ASC';
-
-// Buscar músicas
-try {
-    $query = $db->prepare("SELECT * FROM setlist ORDER BY $order_by $order_dir");
-    $query->execute();
-    $songs = $query->fetchAll(PDO::FETCH_ASSOC);
-} catch(PDOException $e) {
-    die("Erreur lors de la récupération des données: " . $e->getMessage());
-}
-
-// Verificar mensagens de sucesso/erro
-$success_msg = '';
-$error_msg = '';
-if (isset($_SESSION['success'])) {
-    $success_msg = $_SESSION['success'];
-    unset($_SESSION['success']);
-}
-if (isset($_SESSION['error'])) {
-    $error_msg = $_SESSION['error'];
-    unset($_SESSION['error']);
-}
-
-// Verificar se o usuário está logado
-$is_logged_in = isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'];
-?>
-
-<section class="setlist-section">
-    <div class="setlist-header">
-        <h1 class="setlist-title">Set List</h1>
-        
-        <?php if (!empty($success_msg)): ?>
-            <div class="alert alert-success">
-                <?php echo $success_msg; ?>
-            </div>
-        <?php endif; ?>
-        
-        <?php if (!empty($error_msg)): ?>
-            <div class="alert alert-error">
-                <?php echo $error_msg; ?>
-            </div>
-        <?php endif; ?>
-    </div>
+    $action = $_POST["formsongaction"];
     
-    <div class="setlist-container">
-        <div class="table-header">
-            <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Search..." onkeyup="filterSongs()">
+    if ($action == "add"){
+
+        $title = $_POST["title"];
+        $artist = $_POST["artist"];
+        $style = $_POST["style"];
+
+        $sql = "INSERT INTO setlist (`title`, `artist`, `style`) VALUES(:title, :artist, :style )";
+        $query = $connexion->prepare($sql);
+        $query->bindValue(':title', htmlspecialchars($title), PDO::PARAM_STR);
+        $query->bindValue(':artist', htmlspecialchars($artist), PDO::PARAM_STR);
+        $query->bindValue(':style', htmlspecialchars($style), PDO::PARAM_STR);
+
+        // execute insert sql
+        $query->execute();
+
+    }
+    else if ($action=="modify"){
+
+        $title = $_POST["title"];
+        $artist = $_POST["artist"];
+        $style = $_POST["style"];
+
+        $id = $_POST["formsongid"];
+
+        $sql = "UPDATE setlist SET `title` = :title, `artist`=:artist, `style`=:style WHERE id=:id";
+        $query = $connexion->prepare($sql);
+        $query->bindValue(':title', htmlspecialchars($title), PDO::PARAM_STR);
+        $query->bindValue(':artist', htmlspecialchars($artist), PDO::PARAM_STR);
+        $query->bindValue(':style', htmlspecialchars($style), PDO::PARAM_STR);
+        $query->bindValue(':id', $id, PDO::PARAM_STR);
+
+        // execute insert sql
+        $query->execute();
+
+    }
+    else{
+
+        $id = $_POST["formsongid"];
+
+        $sql = "DELETE FROM setlist WHERE id=:id";
+        //echo $sql." ".$id;
+        $query = $connexion->prepare($sql);
+        $query->bindValue(':id', $id, PDO::PARAM_STR);
+
+        $query->execute();
+
+    }
+
+}
+
+
+/* Querying Set List from DB */
+$columns = array('title','artist','style');
+$column = isset($_GET['column']) && in_array($_GET['column'], $columns) ? $_GET['column'] : $columns[0];
+$sort_order = isset($_GET['order']) && strtolower($_GET['order']) == 'desc' ? 'DESC' : 'ASC';
+
+$up_or_down = str_replace(array('ASC','DESC'), array('up','down'), $sort_order); 
+$asc_or_desc = $sort_order == 'ASC' ? 'desc' : 'asc';
+$add_class = ' class="highlight"';
+
+$sql = "SELECT * from setlist ORDER BY " .  $column . " " . $sort_order;
+
+if(!$connexion->query($sql)) {
+  echo "Pb d'accès à la bdd"; 
+}
+else{ 
+  ?> 
+
+  <div class="main">
+  <!-- Titre -->
+    <header class="intro">
+        <h1> Set List </h1>
+    </header>
+
+    <script>
+        /** Search Song Filter Function */
+        function searchFunction() {
+            var value = document.querySelector("#searchInput").value.toLowerCase();
+            document.querySelectorAll("#songTable tbody tr").forEach((tr)=>{
+                tr.style.display = (tr.innerText.toLowerCase().indexOf(value)> -1)?'':'none';
+            });
+        }
+
+         /** Add Or Modify JS Function (using addUpdateSongForm) */
+        function addormodifySong(action, id, title, artist, style) {
+            // Use hidden input (formsongaction) of addUpdateSongForm to store action (add or update) ==> it will put action in $_POST['formsongaction']
+            document.querySelector("#addUpdateSongForm").elements["formsongaction"].value = action;
+            
+            if (action=="add"){
+                // set Text to "Add"
+                document.querySelector('#addUpdateSongModalLabel').innerText="Add Song";
+            }
+            else{
+                // set Text to "Edit"
+                document.querySelector('#addUpdateSongModalLabel').innerText="Edit Song";
+                
+                // pre-fill inputs
+                document.querySelector("#addUpdateSongForm").elements["title"].value = title;
+                document.querySelector("#addUpdateSongForm").elements["artist"].value = artist;
+                document.querySelector("#addUpdateSongForm").elements["style"].value = style;
+
+                // Use hidden input (formsongid) of addUpdateSongForm to store song's id ==> it will put id in $_POST['formsongid']
+                document.querySelector("#addUpdateSongForm").elements["formsongid"].value = id;
+            }
+            
+            // display modal form
+            let modal = document.getElementById('addUpdateSongModal');
+            modal.style.display='block';
+        }
+
+        /** JS function called before submitting add/update song form to check empty values */
+        function check(){
+            let valid=true;
+
+            if (document.querySelector("#addUpdateSongForm").elements["title"].value.trim() == "") {
+                valid=false;
+            }
+            if (document.querySelector("#addUpdateSongForm").elements["artist"].value.trim() == "") {
+                valid=false;
+            }
+            if (document.querySelector("#addUpdateSongForm").elements["style"].value.trim() == "") {
+                valid=false;
+            }
+            
+            if (!valid){
+                return false;
+            }
+            else{
+                return true;
+            }
+        }
+
+         /** Remove Song JS Function (using removeSongForm) */
+         function removeSong(id) {
+            // Use hidden input (formsongaction) of removeSongForm to store action (remove) ==> it will put action in $_POST['formsongaction']
+            document.querySelector("#removeSongForm").elements["formsongaction"].value = "remove";
+            // Use hidden input (formsongid) of removeSongForm to store song's id ==> it will put id in $_POST['formsongid']
+            document.querySelector("#removeSongForm").elements["formsongid"].value = id;
+
+
+            // display modal form
+            let modal = document.getElementById('removeSongModal');
+            modal.style.display='block';
+        }
+
+         /** Fonction pour uploader les paroles */
+        function uploadLyrics(id, title) {
+            document.querySelector("#uploadLyricsForm input[name='formsongid']").value = id;
+            document.querySelector("#uploadLyricsModalLabel").innerText = "Uploader les paroles pour : " + title;
+            
+            let modal = document.getElementById('uploadLyricsModal');
+            modal.style.display='block';
+        }
+
+        /** Fonction pour supprimer les paroles */
+        function removeLyrics(id, title) {
+            document.querySelector("#removeLyricsForm input[name='formsongid']").value = id;
+            document.querySelector("#removeLyricsModalLabel").innerText = "Supprimer les paroles pour : " + title;
+            
+            let modal = document.getElementById('removeLyricsModal');
+            modal.style.display='block';
+        }
+
+    </script>
+
+    <!-- Add or Update Song Form DIV -->
+    <div id="addUpdateSongModal" class="modal">
+  
+        <form id="addUpdateSongForm" onsubmit="return check();"  class="modal-content animate" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]);?>" method="post">
+            <div class="dlgheadcontainer">
+                <span onclick="document.getElementById('addUpdateSongModal').style.display='none'" class="close" title="Close Modal">&times;</span>
+                    <h1 id="addUpdateSongModalLabel">Song Edit :</h1>
             </div>
-            <?php if ($is_logged_in): ?>
-            <div class="actions-container">
-                <button onclick="addSong()" class="add-song-btn">+ Ajouter une chanson</button>
+
+            <div class="dlgcontainer">
+                <input type="hidden" name="formsongaction" id="addorupdate">
+                <input type="hidden" name="formsongid" id="formsongid" >
+
+
+                <label for="uname"><b>Song Title :</b></label>
+                <input type="text" name="title" id="songtitle" placeholder="Song Title">
+
+                <label for="psw"><b>Song Artist :</b></label>
+                <input type="text" name="artist" id="songartist" placeholder="Song Artist">
+
+                <label for="psw"><b>Style :</b></label>
+                <input type="text" name="style" id="songstyle" placeholder="Style">
+                    
+                <button type="submit" class="okbtn">Apply</button>
+                <button type="button" onclick="document.getElementById('addUpdateSongModal').style.display='none'" class="cancelbtn">Cancel</button>
+
             </div>
-            <?php endif; ?>
-        </div>
-        
-        <div style="overflow-x: auto;">
-            <table class="setlist-table">
+
+        </form>
+    </div>
+
+<!-- Formulaire d'upload de paroles -->
+    <div id="uploadLyricsModal" class="modal">
+        <form id="uploadLyricsForm" class="modal-content animate" action="upload.php" method="post" enctype="multipart/form-data">
+            <div class="dlgheadcontainer">
+                <span onclick="document.getElementById('uploadLyricsModal').style.display='none'" class="close" title="Fermer">&times;</span>
+                <h1 id="uploadLyricsModalLabel">Uploader les paroles</h1>
+            </div>
+
+            <div class="dlgcontainer">
+                <input type="hidden" name="formlyricsaction" value="upload">
+                <input type="hidden" name="formsongid" value="">
+
+                <label for="lyricsfile"><b>Sélectionner un fichier PDF :</b></label>
+                <input type="file" name="lyricsfile" accept=".pdf" required>
+                
+                <div style="margin: 10px 0; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+                    <small><b>Format accepté :</b> PDF uniquement</small><br>
+                    <small><b>Taille maximale :</b> 5MB</small>
+                </div>
+                    
+                <button type="submit" class="okbtn">Uploader</button>
+                <button type="button" onclick="document.getElementById('uploadLyricsModal').style.display='none'" class="cancelbtn">Annuler</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Formulaire de suppression de paroles -->
+    <div id="removeLyricsModal" class="modal">
+        <form id="removeLyricsForm" class="modal-content animate" action="upload.php" method="post">
+            <div class="dlgheadcontainer">
+                <span onclick="document.getElementById('removeLyricsModal').style.display='none'" class="close" title="Fermer">&times;</span>
+                <h1 id="removeLyricsModalLabel">Supprimer les paroles</h1>
+            </div>
+
+            <div class="dlgcontainer">
+                <input type="hidden" name="formlyricsaction" value="remove">
+                <input type="hidden" name="formsongid" value="">
+
+                <p>Êtes-vous sûr de vouloir supprimer ces paroles ?</p>
+                <button type="submit" class="okbtn">Oui</button>
+                <button type="button" onclick="document.getElementById('removeLyricsModal').style.display='none'" class="cancelbtn">Non</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Set List Table & Search filter -->
+    <div class="row">
+        <div class="col-sm">
+            <table id="songTable" style="width:90%;margin: auto;">
                 <thead>
                     <tr>
-                        <th>
-                            <a href="?order_by=title&order_dir=<?php echo ($order_by === 'title' ? $next_order_dir : 'ASC'); ?>">
-                                TITLE <?php if ($order_by === 'title') echo ($order_dir === 'ASC') ? '▲' : '▼'; ?>
-                            </a>
-                        </th>
-                        <th>
-                            <a href="?order_by=artist&order_dir=<?php echo ($order_by === 'artist' ? $next_order_dir : 'ASC'); ?>">
-                                ARTIST(S) <?php if ($order_by === 'artist') echo '£'; ?>
-                            </a>
-                        </th>
-                        <th>
-                            <a href="?order_by=style&order_dir=<?php echo ($order_by === 'style' ? $next_order_dir : 'ASC'); ?>">
-                                STYLE <?php if ($order_by === 'style') echo '~'; ?>
-                            </a>
-                        </th>
-                        <?php if ($is_logged_in): ?>
-                        <th class="actions-header">ACTIONS</th>
-                        <?php endif; ?>
+                        <th class="headersearch" colspan="5"><input type="text" class="searchinput" id="searchInput" onkeyup="searchFunction()" placeholder="Search .."></th>
+                    </tr>
+                    <tr>
+                        <th class="headersort"><a href="./setlist.php?column=title&order=<?php echo $asc_or_desc; ?>">TITLE <i class="fas fa-sort<?php echo $column == 'title' ? '-' . $up_or_down : ''; ?>"></i></a></th>
+                        <th class="headersort"><a href="./setlist.php?column=artist&order=<?php echo $asc_or_desc; ?>">ARTIST(S) <i class="fas fa-sort<?php echo $column == 'artist' ? '-' . $up_or_down : ''; ?>"></i></a></th>
+                        <th class="headersort"><a href="./setlist.php?column=style&order=<?php echo $asc_or_desc; ?>">STYLE <i class="fas fa-sort<?php echo $column == 'style' ? '-' . $up_or_down : ''; ?>"></i></a></th>
+                     <?php if ($member) { ?>
+                      <th class="headersort">LYRICS</th>
+                      <?php } ?>
+                      <!-- Colonne PAROLES - visible pour les membres et admin -->
+                        <?php if ($member || $admin) { ?>
+                        <th class="headersort">PAROLES (PDF)</th>
+                        <?php } ?>
+                        
+                        <?php if ($admin){ ?>
+                            <th colspan="2" class="headersort">
+                                <button onclick="addormodifySong('add');" type='button' class='addbtn'><i class='fa fa-plus'></i></button>
+                            </th>
+                        <?php } ?>
+
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (count($songs) > 0): ?>
-                        <?php foreach ($songs as $song): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($song['title']); ?></td>
-                                <td><?php echo htmlspecialchars($song['artist']); ?></td>
-                                <td><?php echo htmlspecialchars($song['style']); ?></td>
-                                <?php if ($is_logged_in): ?>
-                                <td class="actions-cell">
-                                    <a href="#" onclick="editSong(<?php echo $song['id']; ?>, '<?php echo htmlspecialchars($song['title'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($song['artist'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($song['style'], ENT_QUOTES); ?>')" class="edit-btn">✓</a>
-                                    <a href="#" onclick="deleteSong(<?php echo $song['id']; ?>)" class="delete-btn">✗</a>
-                                </td>
-                                <?php endif; ?>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="<?php echo $is_logged_in ? 4 : 3; ?>" class="no-songs">Aucune chanson dans le setlist.</td>
-                        </tr>
-                    <?php endif; ?>
+                <?php 
+                    foreach ($connexion->query($sql) as $row) {
+                        echo "<tr><td>".$row['title']."</td> <td>".
+                                        $row['artist']."</td> <td>".
+                                        $row['style']."</td> ";
+
+                          // Colonne PAROLES - pour les membres et admin
+if ($member || $admin) {
+    echo "<td class='align-middle'>";
+    if ($row['lyrics'] != NULL) {
+        echo "<a href='download_lyrics.php?lyricsPDF=".$row['lyrics']."' class='okbtn' title='Télécharger'><i class='fa fa-download'></i></a>";
+        
+        if ($admin) {
+            echo " <button onclick=\"removeLyrics(".$row['id'].", '".addslashes($row['title'])."')\" type='button' class='cancelbtn' title='Supprimer'><i class='fa fa-trash'></i></button>";
+        }
+    } else {
+        if ($admin) {
+            echo "<button onclick=\"uploadLyrics(".$row['id'].", '".addslashes($row['title'])."')\" type='button' class='addbtn' title='Uploader'><i class='fa fa-upload'></i></button>";
+        } else {
+            echo "-";
+        }
+    }
+    echo "</td>";
+}
+                        if ($admin){
+                            echo "<td class='align-middle'><button onclick=\"addormodifySong('modify', " . $row['id'] . ", '".addslashes($row['title'])."', '".addslashes($row['artist'])."', '".addslashes($row['style'])."');\" type='button' class='editbtn'><i class='fa fa-pen'></i></button></td>"; 
+                            echo "<td class='align-middle'><button onclick='removeSong(" .  $row['id'] . ");' type='button' class='cancelbtn'><i class='fa fa-trash'></i></button></td></tr>" ;
+                        }
+                        else{
+                            echo "</tr>";
+                        }
+                    }
+                ?> 
                 </tbody>
             </table>
         </div>
     </div>
-</section>
 
-<!-- Modal para adicionar/editar música -->
-<div id="songModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="document.getElementById('songModal').style.display='none'">&times;</span>
-        <h2 id="modalTitle">Ajouter une chanson</h2>
-        <form class="modal-form" id="songForm" method="POST" action="manage_song.php" onsubmit="return validateSongForm()">
-            <input type="hidden" id="songId" name="songId" value="">
-            <div>
-                <label for="title">Titre:</label>
-                <input type="text" id="title" name="title" required>
-            </div>
-            <div>
-                <label for="artist">Artiste(s):</label>
-                <input type="text" id="artist" name="artist" required>
-            </div>
-            <div>
-                <label for="style">Style:</label>
-                <input type="text" id="style" name="style" required>
-            </div>
-            <button type="submit" name="saveSong">Enregistrer</button>
-        </form>
-    </div>
+
 </div>
-
-<script>
-function filterSongs() {
-    const input = document.getElementById('searchInput');
-    const filter = input.value.toUpperCase();
-    const table = document.querySelector('.setlist-table');
-    const tr = table.getElementsByTagName('tr');
-    
-    for (let i = 1; i < tr.length; i++) {
-        let td = tr[i].getElementsByTagName('td');
-        let found = false;
-        
-        const columnsToSearch = <?php echo $is_logged_in ? 3 : 3; ?>;
-        for (let j = 0; j < columnsToSearch; j++) {
-            if (td[j] && td[j].innerText.toUpperCase().indexOf(filter) > -1) {
-                found = true;
-                break;
-            }
-        }
-        
-        tr[i].style.display = found ? '' : 'none';
-    }
+  
+<?php
 }
 
-function addSong() {
-    document.getElementById('modalTitle').innerText = 'Ajouter une chanson';
-    document.getElementById('songId').value = '';
-    document.getElementById('title').value = '';
-    document.getElementById('artist').value = '';
-    document.getElementById('style').value = '';
-    document.getElementById('songModal').style.display = 'block';
-}
 
-function editSong(id, title, artist, style) {
-    document.getElementById('modalTitle').innerText = 'Modifier la chanson';
-    document.getElementById('songId').value = id;
-    document.getElementById('title').value = title;
-    document.getElementById('artist').value = artist;
-    document.getElementById('style').value = style;
-    document.getElementById('songModal').style.display = 'block';
-}
-
-function deleteSong(id) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette chanson?')) {
-        window.location.href = 'manage_song.php?delete=' + id;
-    }
-}
-
-function validateSongForm() {
-    const title = document.getElementById('title').value.trim();
-    const artist = document.getElementById('artist').value.trim();
-    const style = document.getElementById('style').value.trim();
-    
-    if (!title || !artist || !style) {
-        alert('Tous les champs sont obligatoires');
-        return false;
-    }
-    
-    return true;
-}
-
-window.onclick = function(event) {
-    const loginModal = document.getElementById('loginModal');
-    const songModal = document.getElementById('songModal');
-    
-    if (event.target == loginModal) {
-        loginModal.style.display = 'none';
-    }
-    if (event.target == songModal) {
-        songModal.style.display = 'none';
-    }
-}
-</script>
-
-<?php require 'footer.php'; ?>
+require('footer.php');
+?>
